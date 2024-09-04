@@ -1,0 +1,23 @@
+*.pyc
+.vscode
+
+.tox
+
+*.so*
+*.a*
+
+dist
+build
+# Default folder for output when running nassu
+output
+# Output from Sphinx
+docs/build
+# Pyre related
+.pyre
+.pyre_configuration
+*.watchmanconfig
+
+.ipynb_checkpoints
+
+# Results folders
+**/results/

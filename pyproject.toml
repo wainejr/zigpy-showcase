@@ -1,0 +1,97 @@
+[tool.poetry]
+name = "zigpy"
+version = "0.1.0"
+description = "Showcase of Zig and Python using Cython"
+
+authors = ["Waine Oliveira Jr."]
+maintainers = ["Waine Oliveira Jr."]
+
+readme = "README.md"
+
+packages = [{include = "zigpy"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+
+cython = "^3.0.11"
+ziglang = "^0.13.0"
+
+[build-system]
+requires = ["poetry-core", "setuptools", "wheel", "ziglang", "cython"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = true
+
+[tool.black]
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+include = '(\.pyi?$|\.ipynb)'
+line-length = 99
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 99
+src_paths = ["nassu", "tests", "scripts"]
+skip_glob = ["**/__init__.py"] # avoid circular imports
+known_third_party = "lnas"
+
+# Global options:
+
+[tool.mypy]
+python_version = "3.10"
+
+no_site_packages = true
+
+exclude = ["docs/"]
+# warn_return_any = true
+warn_unused_ignores = true
+warn_unreachable = true
+warn_redundant_casts = true
+
+ignore_missing_imports = true
+# pretty = true
+
+[tool.ruff]
+fixable = ["ALL"]
+ignore = ["E731"] # ignore not use lambda, use `dev`
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+line-length = 99
+target-version = "py310"
