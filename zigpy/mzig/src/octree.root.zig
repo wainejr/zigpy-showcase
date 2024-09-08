@@ -65,17 +65,11 @@ fn BlockCalls(comptime dim: i32) type {
         }
         pub fn block_quadr(self: [*c]BlockType) callconv(.C) a2s(dim, i8) {
             const res = self.*.block_quadr();
-            if (res == null) {
-                std.debug.panic("I don't have a quadr man\n", .{});
-            }
-            return a2s(dim, i8).new(res.?);
+            return a2s(dim, i8).new(res);
         }
         pub fn block_quadr_idx(self: [*c]BlockType) callconv(.C) usize {
             const res = self.*.block_quadr_idx();
-            if (res == null) {
-                return 1000;
-            }
-            return res.?;
+            return res;
         }
         pub fn child_quadr_idx(self: [*c]BlockType, idx: usize) callconv(.C) [*c]BlockType {
             const res = self.*.child_quadr_idx(idx) catch |err| {
@@ -121,52 +115,53 @@ fn ForestCalls(comptime dim: i32) type {
     const BlockType = ForestType.BlockType;
     return extern struct {
         const Self = @This();
+        var forest: ?ForestType = null;
 
         forest_ptr: u64,
         dim: i32,
 
-        fn forest(self: *const Self) *ForestType {
-            return @ptrFromInt(self.*.forest_ptr);
-        }
-
         pub fn new(domain_size: a2s(dim, usize), periodic_domain: a2s(dim, bool)) callconv(.C) Self {
-            var forest_slice = allocator.alloc(ForestType, 1) catch |err| {
-                std.debug.panic("Error on new forest {any}\n", .{err});
-            };
+            if (Self.forest != null) {
+                std.debug.panic("I already have a forest, free me than create a new one\n", .{});
+            }
 
-            forest_slice[0] = ForestType.init(allocator, domain_size.arr(), periodic_domain.arr());
-            (&forest_slice[0]).initialize_blocks() catch |err| {
+            Self.forest = ForestType.init(domain_size.arr(), periodic_domain.arr());
+            Self.forest.?.initialize_blocks(allocator) catch |err| {
                 std.debug.panic("Error on new forest block initialization {any}\n", .{err});
             };
 
+            // You can use this to return a index for the forest, in case more forest are allocated
             const c_forest: Self = .{
-                .forest_ptr = @intFromPtr(forest_slice.ptr),
+                .forest_ptr = 0,
                 .dim = dim,
             };
             return c_forest;
         }
 
         pub fn free(self: *Self) callconv(.C) void {
-            self.forest().free();
-            arena.allocator().destroy(self.forest());
+            if (Self.forest == null) {
+                std.debug.panic("I don't have a forest, why you're freeing me?\n", .{});
+            }
+            Self.forest.?.free();
+            Self.forest = null;
             self.forest_ptr = 0;
         }
 
         pub fn block_from_idx(self: *const Self, idx: usize) callconv(.C) ?*BlockType {
-            const frt = self.forest();
-            if (idx >= frt.all_blocks.items.len) {
-                return null;
-            }
+            _ = self;
+            const frt = Self.forest.?;
             return frt.block_from_idx(idx);
         }
 
         pub fn block_from_pos(self: *const Self, pos: a2s(dim, f32), max_lvl: i8) callconv(.C) ?*BlockType {
-            const frt = self.forest();
+            _ = self;
+            const frt = Self.forest.?;
             return frt.find_block(.{ .abs_pos = pos.arr() }, if (max_lvl >= 0) max_lvl else null);
         }
 
         pub fn block_from_quadr(self: *const Self, pos_quadr: a2s(dim, i32), quadr_lvl: i8, max_lvl: i8) callconv(.C) ?*BlockType {
-            const frt = self.forest();
+            _ = self;
+            const frt = Self.forest.?;
             return frt.find_block(.{
                 .lvl_pos = .{
                     .pos_quadr = pos_quadr.arr(),
@@ -176,7 +171,9 @@ fn ForestCalls(comptime dim: i32) type {
         }
 
         pub fn divide_block(self: *const Self, block_idx: usize) callconv(.C) void {
-            self.forest().divide_block(block_idx) catch |err| {
+            _ = self;
+            var frt = Self.forest.?;
+            frt.divide_block(allocator, block_idx) catch |err| {
                 std.debug.panic("Error on dividing block {any}\n", .{err});
             };
         }
