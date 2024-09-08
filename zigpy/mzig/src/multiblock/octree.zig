@@ -106,6 +106,10 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
                 return true;
             }
             for (self.children) |c| {
+                if (c == null) {
+                    std.debug.print("why the fuck am i here man\n", .{});
+                    return true;
+                }
                 if (c.?.is_leaf()) {
                     return true;
                 }
@@ -115,18 +119,23 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
 
         pub fn neighbour_diff_lvl(self: *const Self, direction: [dim]i8) !?*Self {
             const nb = try self.neighbour(direction);
-            if (nb != null) {
+            if (nb != null)
                 return nb;
-            }
-            if (self.lvl() == 0) {
+
+            if (self.lvl() == 0)
                 return null;
-            }
-            const b_quadr = self.block_quadr().?;
+
+            const b_quadr = self.block_quadr();
             var dir_parent: [dim]i8 = undefined;
+            var is_valid_dir = false;
             for (0..dim) |d| {
                 dir_parent[d] = @divFloor(b_quadr[d] + direction[d], 2);
+                if (dir_parent[d] != 0)
+                    is_valid_dir = true;
             }
-            return self.parent.?.neighbour(dir_parent);
+            if (is_valid_dir)
+                return self.parent.?.neighbour(dir_parent);
+            return null;
         }
 
         pub fn neighbour(self: *const Self, direction: [dim]i8) !?*Self {
@@ -137,17 +146,17 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
 
             // Fill dim_walk and n_dir
             for (direction, 0..) |dir, i| {
-                if (dir != 0 and dir != 1 and dir != -1) {
+                if (dir != 0 and dir != 1 and dir != -1)
                     return BlockError.InvalidNeighbour;
-                }
+
                 if (dir != 0) {
                     dim_walk[@intCast(n_dim)] = @intCast(i);
                     n_dim += 1;
                 }
             }
-            if (n_dim == 0) {
+            if (n_dim == 0)
                 return BlockError.InvalidNeighbour;
-            }
+
             if (n_dim == 1) {
                 const nd = dim_walk[0];
                 const dir = direction[@intCast(nd)];
@@ -178,9 +187,8 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
                 const adj_nb = try self.neighbour(adj_dir);
                 if (adj_nb != null) {
                     const nb_check = try adj_nb.?.neighbour(rest_dir);
-                    if (nb_check != null) {
+                    if (nb_check != null)
                         return nb_check;
-                    }
                 }
             }
             // No block was found, return null
@@ -190,9 +198,8 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
         fn adj_neighbour_offsets(axis: u8, offset: i8) [dim]i8 {
             var full_offset: [dim]i8 = .{0} ** dim;
             for (0..dim) |d| {
-                if (axis == d) {
+                if (axis == d)
                     full_offset[d] = offset;
-                }
             }
             return full_offset;
         }
@@ -216,9 +223,9 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
                         }
                         const parent: ?*Self = if (nb_parent[axis] == 0) self else try self.neighbour(nb_parent);
                         // Neighbour block doesn't exists or doesn't have children
-                        if (parent == null or parent.?.is_leaf()) {
+                        if (parent == null or parent.?.is_leaf())
                             continue;
-                        }
+
                         // Get neighbour from parent quadrant and update it
                         const nb = try parent.?.child_quadr(nb_quadr);
                         c.?.adj_neighbours[axis][offset_idx] = nb.?;
@@ -235,62 +242,58 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
 
         pub fn add_children(self: *Self, children_add: [n_children]*Self) !void {
             for (children_add) |c| {
-                if (c.parent != null) {
+                if (c.parent != null)
                     return BlockError.BlockHasParentAlready;
-                }
             }
-            if (!self.is_leaf()) {
+            if (!self.is_leaf())
                 return BlockError.BlockHasChildrenAlready;
-            }
+
             self.children = undefined;
-            for (children_add) |c| {
+            for (children_add) |c|
                 c.parent = self;
-            }
+
             std.mem.copyForwards(?*Self, &(self.children), &children_add);
         }
 
-        pub inline fn block_quadr(self: *const Self) ?[dim]i8 {
+        pub inline fn block_quadr(self: *const Self) [dim]i8 {
             const qi = self.block_quadr_idx();
-            if (qi == null) {
-                return null;
-            }
-            return Self.quadrs_pos[qi.?];
+            return Self.quadrs_pos[qi];
         }
 
-        pub inline fn block_quadr_idx(self: *const Self) ?usize {
-            if (self.parent == null) {
-                return null;
-            }
+        pub inline fn block_quadr_idx(self: *const Self) usize {
+            if (self.parent == null)
+                return 0;
+
             const children = self.parent.?.children;
 
             const needle: [1]?*const Self = [1]?*const Self{self};
             // Use std.mem.indexOf to find the index of self in children
             const index = std.mem.indexOf(?*const Self, &children, &needle);
-            if (index == null) {
+            if (index == null)
                 std.debug.panic("Couldn't find myself in parent. Why?", .{});
-            }
+
             return index.?;
         }
 
         pub fn child_quadr_idx(self: *const Self, idx: usize) !?*Self {
-            if (idx >= (1 << dim)) {
+            if (idx >= (1 << dim))
                 return BlockError.QuadrNotExists;
-            }
-            if (self.is_leaf()) {
+
+            if (self.is_leaf())
                 return null;
-            }
+
             return self.children[idx].?;
         }
 
         pub fn child_quadr(self: *const Self, quadr: [dim]i8) !?*Self {
-            if (self.is_leaf()) {
+            if (self.is_leaf())
                 return null;
-            }
+
             var idx: usize = 0;
             inline for (0..dim) |d| {
-                if (quadr[d] != 0 and quadr[d] != 1) {
+                if (quadr[d] != 0 and quadr[d] != 1)
                     return BlockError.QuadrNotExists;
-                }
+
                 idx += @as(usize, @intCast(quadr[d])) * (1 << d);
             }
             return self.child_quadr_idx(idx);
@@ -300,9 +303,9 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
 
 fn list2ref(comptime T: type, objs: *[T.n_children]T) [T.n_children]*T {
     var refs: [T.n_children]*T = undefined;
-    for (0..T.n_children) |i| {
+    for (0..T.n_children) |i|
         refs[i] = &(objs[i]);
-    }
+
     return refs;
 }
 
@@ -319,7 +322,7 @@ fn assert_block_properties(comptime dim: i32, T: type, block: *OctreeBlock(dim, 
             try std.testing.expectEqualSlices(
                 i8,
                 &BlockType.quadrs_pos[j],
-                &bc.block_quadr().?,
+                &bc.block_quadr(),
             );
         }
     }
@@ -328,9 +331,9 @@ fn assert_block_properties(comptime dim: i32, T: type, block: *OctreeBlock(dim, 
     // All neighbours must have same level
     for (possible_nbs) |nb_dir| {
         const nb_ask = try block.neighbour(nb_dir);
-        if (nb_ask == null) {
+        if (nb_ask == null)
             continue;
-        }
+
         const nb = nb_ask.?;
         // neighbours must have same level
         try std.testing.expectEqual(nb.lvl(), block.lvl());
@@ -463,11 +466,9 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
 
         pub const BlockType = OctreeBlock(dim, BlockData);
 
-        allocator: std.mem.Allocator,
+        // allocator: std.mem.Allocator,
         /// All blocks in Forest
         all_blocks: std.ArrayList(BlockType),
-        /// Level zero blocks, useful for finding blocks by position
-        domain_blocks: []BlockType,
         /// Domain size (in number of blocks)
         domain_size: [dim]usize,
         /// Wheter each dimension is periodic or not
@@ -478,15 +479,14 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
             const b_pos = block.data.pos;
             const block_size = block.size();
             for (0..dim) |d| {
-                if (self.domain_periodic[d]) {
+                if (self.domain_periodic[d])
                     continue;
-                }
-                if (b_pos[d] == 0 and direction[d] == -1) {
+
+                if (b_pos[d] == 0 and direction[d] == -1)
                     return false;
-                }
-                if ((b_pos[d] + block_size) == @as(f32, @floatFromInt(self.domain_size[d])) and direction[d] == 1) {
+
+                if ((b_pos[d] + block_size) == @as(f32, @floatFromInt(self.domain_size[d])) and direction[d] == 1)
                     return false;
-                }
             }
             return true;
         }
@@ -497,15 +497,15 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
                 const b_idx = block.data.idx;
                 const b_pos = self.domain_idx2pos(b_idx);
                 var f_pos: [dim]f32 = undefined;
-                for (0..dim) |d| {
+                for (0..dim) |d|
                     f_pos[d] = @floatFromInt(b_pos[d]);
-                }
+
                 return f_pos;
             }
             const parent_pos = self.block_pos_min(block.parent.?);
             const block_size = block.size();
             var b_pos: [dim]f32 = undefined;
-            const quadr = block.block_quadr().?;
+            const quadr = block.block_quadr();
             for (0..dim) |d| {
                 var q: f32 = @floatFromInt(quadr[d]);
                 q *= block_size;
@@ -521,9 +521,9 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
                 .lvl_pos => |p_lvl| {
                     var abs_pos: [dim]f32 = undefined;
                     const b_size = BlockType.ratio_size_lvl(p_lvl.lvl);
-                    for (0..dim) |d| {
+                    for (0..dim) |d|
                         abs_pos[d] = @floatFromInt(p_lvl.pos_quadr[d] * b_size);
-                    }
+
                     const b = self.find_block(.{ .abs_pos = abs_pos }, max_lvl);
                     return b;
                 },
@@ -535,9 +535,8 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
                     var p_use: [dim]f32 = p;
                     for (0..dim) |d| {
                         // Make an offset in border to allow for the max position to be the last block
-                        if (p_use[d] == @as(f32, @floatFromInt(self.domain_size[d]))) {
+                        if (p_use[d] == @as(f32, @floatFromInt(self.domain_size[d])))
                             p_use[d] -= 1e-6;
-                        }
                     }
                     break :blk p_use;
                 },
@@ -548,16 +547,15 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
             var pos_lvl0_u: [dim]u32 = undefined;
             for (0..dim) |d| {
                 pos_lvl0[d] = @intFromFloat(@floor(abs_pos[d]));
-                if (pos_lvl0[d] < 0 or pos_lvl0[d] > self.domain_size[d]) {
+                if (pos_lvl0[d] < 0 or pos_lvl0[d] > self.domain_size[d])
                     return null;
-                }
+
                 pos_lvl0_u[d] = @intCast(pos_lvl0[d]);
             }
 
             const block_lvl_0 = self.domain_block_from_pos_idx(pos_lvl0_u);
-            if (block_lvl_0 == null) {
+            if (block_lvl_0 == null)
                 return null;
-            }
 
             var block_use = block_lvl_0.?;
             var b_lvl: i32 = 0;
@@ -589,9 +587,9 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
 
         pub inline fn domain_n_blocks(self: *const Self) usize {
             var n_blocks: usize = 1;
-            for (self.domain_size) |n_b| {
+            for (self.domain_size) |n_b|
                 n_blocks *= n_b;
-            }
+
             return n_blocks;
         }
 
@@ -616,30 +614,27 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
 
         pub inline fn domain_block_from_pos_idx(self: *const Self, idx_pos: [dim]u32) ?*BlockType {
             const idx = self.domain_pos2idx(idx_pos);
-            if (idx >= self.domain_n_blocks()) {
+            if (idx >= self.domain_n_blocks())
                 return null;
-            }
+
             return self.block_from_idx(idx);
         }
 
-        pub fn init(allocator: std.mem.Allocator, domain_size: [dim]usize, domain_periodic: [dim]bool) Self {
+        pub fn init(domain_size: [dim]usize, domain_periodic: [dim]bool) Self {
             const self: Self = .{
-                .allocator = allocator,
                 .all_blocks = undefined,
-                .domain_blocks = undefined,
                 .domain_size = domain_size,
                 .domain_periodic = domain_periodic,
             };
             return self;
         }
 
-        pub fn initialize_blocks(self: *Self) !void {
+        pub fn initialize_blocks(self: *Self, allocator: std.mem.Allocator) !void {
             const n_blocks = self.domain_n_blocks();
 
-            self.all_blocks = std.ArrayList(BlockType).init(self.allocator);
+            self.all_blocks = std.ArrayList(BlockType).init(allocator);
             try self.all_blocks.ensureTotalCapacity(n_blocks * 10);
             self.all_blocks.appendNTimesAssumeCapacity(BlockType.init(), n_blocks);
-            self.domain_blocks = self.all_blocks.items[0..n_blocks];
             self.initialize_domain_blocks_neighbours();
         }
 
@@ -675,7 +670,6 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
 
         pub fn free(self: *Self) void {
             self.all_blocks.deinit();
-            self.domain_blocks = &.{};
         }
 
         fn request_new_blocks(self: *Self, comptime n_blocks_add: usize, blocks_ptrs: ?*[n_blocks_add]*BlockType) !void {
@@ -692,9 +686,8 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
             }
 
             const new_base_ptr: usize = @intFromPtr(self.all_blocks.items.ptr);
-            if (old_base_ptr != new_base_ptr) {
+            if (old_base_ptr != new_base_ptr)
                 self.update_blocks_pointers(old_base_ptr, new_base_ptr);
-            }
 
             if (blocks_ptrs != null) {
                 for (n_blocks_curr..n_blocks_after, 0..) |full_idx, idx| {
@@ -720,9 +713,8 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
             // If a block is runned, but it's not a leaf, all its possible neighbours must be refined
             // So if this is not satisfied, we can just return
             // Or in case of forcing refinement
-            if (!(block_check.is_runned() and !block_check.is_leaf()) and !force_neighbour_refinement) {
+            if (!(block_check.is_runned() and !block_check.is_leaf()) and !force_neighbour_refinement)
                 return;
-            }
 
             // Enforce that the neighbour blocks have the same level
             for (possible_neighbours) |offset_nb| {
@@ -754,9 +746,9 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
 
         fn divide_block_single(self: *Self, block_idx: usize) !void {
             const b_ref = self.block_from_idx(block_idx);
-            if (!b_ref.is_leaf()) {
+            if (!b_ref.is_leaf())
                 return BlockError.BlockHasChildrenAlready;
-            }
+
             var children_use: [BlockType.n_children]*BlockType = undefined;
             try self.request_new_blocks(BlockType.n_children, &children_use);
             try self.block_from_idx(block_idx).divide_single_block(children_use);
@@ -790,18 +782,17 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
             // Enforce that the neighbour blocks have the same level
             for (possible_neighbours) |offset_nb| {
                 const block_check = self.block_from_idx(block_idx);
-                if (!self.block_communicate_direction(block_check, offset_nb)) {
+                if (!self.block_communicate_direction(block_check, offset_nb))
                     continue;
-                }
+
                 const nb = block_check.neighbour_diff_lvl(offset_nb) catch {
                     unreachable;
                 };
-                if (nb == null) {
+                if (nb == null)
                     std.debug.panic("This should never happen, why i don't have a neighbour available?\n", .{});
-                }
-                if (nb.?.lvl() < block_check.lvl() and nb.?.is_leaf()) {
+
+                if (nb.?.lvl() < block_check.lvl() and nb.?.is_leaf())
                     try self.divide_block_recursive(nb.?.data.idx, list_idxs);
-                }
             }
 
             try self.divide_block_single(block_idx);
@@ -811,8 +802,8 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
         ///
         /// IMPORTANT: this function may invalidate previous pointers to blocks, so make sure to
         /// update previous block pointers to get new valid ones
-        pub fn divide_block(self: *Self, block_idx: usize) !void {
-            var idxs_to_refine = std.ArrayList(usize).init(self.allocator);
+        pub fn divide_block(self: *Self, allocator: std.mem.Allocator, block_idx: usize) !void {
+            var idxs_to_refine = std.ArrayList(usize).init(allocator);
             defer idxs_to_refine.deinit();
             try self.divide_block_recursive(block_idx, &idxs_to_refine);
         }
@@ -828,17 +819,16 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
                         std.debug.panic("why do I have an invalid neighbour?\n", .{});
                     };
                     const communicate = self.block_communicate_direction(block, offset_nb);
-                    if (communicate and !block.is_leaf() and block.is_runned()) {
+                    if (communicate and !block.is_leaf() and block.is_runned())
                         std.debug.assert(nb != null);
-                    }
                 }
             }
         }
 
         fn get_new_pointer(base_old: usize, base_new: usize, old_ptr: usize) usize {
-            if (old_ptr < base_old) {
+            if (old_ptr < base_old)
                 std.debug.panic("Why i'm sending old pts less that old base? old ptr {} base old {}", .{ old_ptr, base_old });
-            }
+
             const offset = old_ptr - base_old;
             return base_new + offset;
         }
@@ -852,28 +842,27 @@ pub fn OctreeForest(comptime octree_dim: i32) type {
                 const b = &(self.all_blocks.items[idx]);
                 b.data.start_ptr = @intFromPtr(self.all_blocks.items.ptr);
                 b.data.idx = idx;
-                if (b.parent != null) {
+                if (b.parent != null)
                     b.parent = @ptrFromInt(Self.get_new_pointer(
                         old_base_ptr,
                         new_base_ptr,
                         @intFromPtr(b.parent.?),
                     ));
-                }
+
                 if (!b.is_leaf()) {
-                    for (0..BlockType.n_children) |cidx| {
+                    for (0..BlockType.n_children) |cidx|
                         b.children[cidx] = @ptrFromInt(Self.get_new_pointer(
                             old_base_ptr,
                             new_base_ptr,
                             @intFromPtr(b.children[cidx]),
                         ));
-                    }
                 }
                 for (0..dim) |d| {
                     for (0..2) |nb_idx| {
                         const nb = b.adj_neighbours[d][nb_idx];
-                        if (nb == null) {
+                        if (nb == null)
                             continue;
-                        }
+
                         b.adj_neighbours[d][nb_idx] = @ptrFromInt(get_new_pointer(
                             old_base_ptr,
                             new_base_ptr,
@@ -893,10 +882,7 @@ fn assert_octree_neighbours_properties(
 ) !void {
     // Check that neighbour parent blocks have at most one level of difference
     const possible_nbs = all_possible_neighbours(dim);
-    var b_quadr: [dim]i8 = .{0} ** dim;
-    if (block.lvl() > 0) {
-        b_quadr = block.block_quadr().?;
-    }
+    // const b_quadr: [dim]i8 = block.block_quadr();
 
     for (possible_nbs) |nb_dir| {
         const communicate = forest.block_communicate_direction(block, nb_dir);
@@ -963,11 +949,11 @@ test "domain_initialization" {
         const domain_size: [dim]usize = if (dim == 3) .{ 12, 18, 13 } else .{ 12, 18 };
         const ds = domain_size;
         const periodic_dim: [dim]bool = if (dim == 3) .{ true, false, true } else .{ true, false };
-        var forest = Forest.init(allocator, domain_size, periodic_dim);
+        var forest = Forest.init(domain_size, periodic_dim);
         defer forest.free();
 
         try std.testing.expectEqual(if (dim == 2) ds[0] * ds[1] else ds[0] * ds[1] * ds[2], forest.domain_n_blocks());
-        try forest.initialize_blocks();
+        try forest.initialize_blocks(allocator);
 
         try assert_octree_idxs(dim, forest);
         for (0..forest.domain_n_blocks()) |idx| {
@@ -1021,13 +1007,13 @@ test "domain_block_division" {
         const Forest = OctreeForest(dim);
         const domain_size: [dim]usize = if (dim == 3) .{ 12, 6, 8 } else .{ 2, 2 };
         const periodic_dim: [dim]bool = if (dim == 3) .{ true, true, true } else .{ true, true };
-        var forest = Forest.init(allocator, domain_size, periodic_dim);
+        var forest = Forest.init(domain_size, periodic_dim);
         defer forest.free();
-        try forest.initialize_blocks();
+        try forest.initialize_blocks(allocator);
 
         for (0..5) |_| {
             const last_idx: usize = forest.all_blocks.items.len - 1;
-            try forest.divide_block(last_idx);
+            try forest.divide_block(allocator, last_idx);
             try std.testing.expectEqual(false, forest.block_from_idx(last_idx).is_leaf());
             try assert_octree_idxs(dim, forest);
             for (0..forest.all_blocks.items.len) |idx| {
@@ -1046,9 +1032,9 @@ test "domain_find_block" {
         const Forest = OctreeForest(dim);
         const ds: [dim]usize = if (dim == 3) .{ 12, 18, 7 } else .{ 12, 18 };
         const periodic_dim: [dim]bool = if (dim == 3) .{ true, false, true } else .{ true, false };
-        var forest = Forest.init(allocator, ds, periodic_dim);
+        var forest = Forest.init(ds, periodic_dim);
         defer forest.free();
-        try forest.initialize_blocks();
+        try forest.initialize_blocks(allocator);
 
         const pos_valid: [dim]f32 = if (dim == 3) .{ ds[0], 0, 4 } else .{ ds[0], 0 };
         const pos_invalid: [dim]f32 = if (dim == 3) .{ ds[0] + 1, 2, ds[2] - 1 } else .{ 0, -1 };
@@ -1056,7 +1042,7 @@ test "domain_find_block" {
         for (0..10) |_| {
             const last_idx: usize = forest.all_blocks.items.len - 1;
             const lvl_expect = forest.block_from_idx(last_idx).lvl() + 1;
-            try forest.divide_block(last_idx);
+            try forest.divide_block(allocator, last_idx);
             const b_valid = forest.find_block(.{ .abs_pos = pos_valid }, null);
             try std.testing.expect(b_valid != null);
 
