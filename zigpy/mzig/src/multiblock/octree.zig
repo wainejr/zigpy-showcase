@@ -43,7 +43,7 @@ pub fn OctreeBlock(comptime dim: i32, T: type) type {
         parent: ?*Self,
         /// Block may have no children or 2^dim children blocks
         children: [n_children]?*Self,
-        /// Neighbour blocks to this, as [min, max][x, y, z]
+        /// Neighbour blocks to this, as [x, y, z][min, max]
         adj_neighbours: [dim][2]?*Self,
         data: T,
 
